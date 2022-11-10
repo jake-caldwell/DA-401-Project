@@ -7,12 +7,14 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-rm(list = ls())
-library("dplyr")
-library("tidyr")
+rm(list = ls()) # clears directory every time code is run for memory saving
+library('ggplot2')
+library(data.table)
+library(dplyr)
+library(tidyr)
 library(rmarkdown)
 library(randomForest)
-library(ggplot2)
+library(ggalt)
 library(GGally)
 library(caret)
 library(tidyr)
@@ -24,28 +26,31 @@ library(MASS)
 library(e1071)
 library(class)
 library(cutpointr)
-library(car)
 library(boot)
-library(tidyverse)           
 library(ggthemes)
 library(Hmisc)               
-library(xtable)
 library(pander)
-library(kableExtra)
 library(purrr)
+library(vtable)
+require(gplots)
+library(ggvenn)
+library(RColorBrewer)
+library(tree)
 ```
 
 ```{r}
 NBA <- data.frame() # creates an empty Data Frame
-listcsv <- dir(pattern = "*SeasonStats.csv") # creates the list of all the csv files in the directory
+listcsv <- dir(path = "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\", pattern = "*SeasonStats.csv")
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 for (k in 1:length(listcsv)){
- NBA <- rbind(NBA,read.csv(listcsv[k]))
+ NBA <- rbind(NBA, read.csv(listcsv[k]))
 }
 # For Loop reads in each csv from my DA 401 project directory and binds it to the NBAData data frame, which creates a data frame containing all NBA player per game data from 1981 to 2022
 ```
 
 ```{r}
 # Renaming variables and filtering data
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 NBA <- rename(NBA, "FGpct" = "FG.")
 NBA <- rename(NBA, "eFGpct" = "eFG.")
 NBA <- rename(NBA, "ThP" = "X3P")
@@ -55,7 +60,8 @@ NBA <- rename(NBA, "TwP" = "X2P")
 NBA <- rename(NBA, "TwPA" = "X2PA")
 NBA <- rename(NBA, "TwPpct" = "X2P.")
 NBA <- rename(NBA, "FTpct" = "FT.")
-NBA <- rename(NBA, "Player" = "ï..Player")
+NBA <- NBA%>%filter(Tm != 'TOT')
+NBA$Player <- gsub('[\\*,]', '', as.character(NBA$Player))
 NBA[is.na(NBA)] <- 0
 NBA<-filter(NBA, NBA$G > 20)
 NBA <- filter(NBA, NBA$Pos %in% c('PG', 'SG', 'SF', 'PF', 'C'))
@@ -76,7 +82,7 @@ DRBpct
 #Creation of GameScore and PER
 NBA<- NBA%>%mutate(GameScore = NBA$PTS + 0.4*NBA$FG - 0.7*NBA$FGA - 0.4*(NBA$FTA - NBA$FT) + 0.7*NBA$ORB + 0.3*NBA$DRB +0.7*NBA$STL + 0.7*NBA$AST + 0.7*NBA$BLK - 0.4*NBA$PF - NBA$TOV)
 
-#Unadjusted PER
+#Un-adjusted PER
 NBA <- NBA %>% mutate(uPER = (1/MP)*(ThP- ((PF*18.8)/21) +((FT/2)*(2-(21.8/(3*37.3))))+(FG * (2-((factor*21.8)/37.3)))+((2*AST)/3) +(VOP)+(DRBpct*((2*ORB)+BLK-(0.2464*(FTA-FT))-(FGA-FG)                  -TRB)+((0.44*24.9*PF)/21)-(TOV+ORB)+STL+TRB-(.1936*(FTA-FT)))))
                         
 
@@ -96,12 +102,11 @@ st(NBA, vars = c('Age', 'PTS', 'AST', 'TRB', 'FGpct', 'TOV', 'PF', 'BLK', 'STL',
 
 ```{r} 
 #Writing cleaned and wrangled CSV to put into tableau
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 write.csv(NBA,"NBA.csv", row.names = FALSE)
 ```
 
 ```{r}
-library('ggplot2')
-library('ggthemes')
 #Creating histograms and density plots for GameScore and PER
 GameScoreDist <- NBA %>% ggplot(aes(x=GameScore))+
   geom_histogram(bins = 10, fill = 'blue', color = '#000000', aes(y = ..density..))+
@@ -135,6 +140,7 @@ dev.off
 
 ```{r}
 # Creating dataframe of career averages for PER and GameScore
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 
 CareerAvgPER <- NBA %>% dplyr::select(Player, Pos, PER) %>% group_by(Player) %>% summarise('PER' = mean(PER))
 CareerAvgGameScore <- NBA %>% dplyr::select(Player, Pos, GameScore) %>% group_by(Player) %>% summarise('GameScore' = mean(GameScore))
@@ -152,13 +158,13 @@ top50GameScore <- CareerAvgGameScore[CareerAvgGameScore$GameScore %in% topGameSc
 
 ```{r}
 #Create List of NBA 75 Players 
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 NBA75 <- read.csv("NBA75.csv")
-NBA75 <- rename(NBA75, "Player" = "ï..Player")
 ```
 
 ```{r}
 #Creating Similarity Venn diagrams for the NBA75 team to the top Career PER and GameScore.
-
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 both1 <- top50PER[top50PER$Player %in% NBA75$Player,] # in both, same as call: intersect(first, second)
 onlyfirst1 <-top50PER[!top50PER$Player %in% NBA75$Player,] # only in 'first', same as: setdiff(first, second)
 onlysecond1 <- NBA75[!NBA75$Player %in% top50PER$Player,] # only in 'second', same as: setdiff(second, first)
@@ -168,7 +174,6 @@ length(onlysecond1)
 
 
 # If you don't have the 'gplots' package, type: install.packages("gplots")
-require("gplots")
 venn(list(first.vector = top50PER$Player, second.vector = NBA75$Player))
 
 both2 <- top50GameScore[top50GameScore$Player %in% NBA75$Player,] # in both, same as call: intersect(first, second)
@@ -180,14 +185,12 @@ length(onlysecond2)
 
 
 # If you don't have the 'gplots' package, type: install.packages("gplots")
-require("gplots")
 venn(list(first.vector = top50GameScore$Player, second.vector = NBA75$Player))
 ```
 
 ```{r}
 #Different way to make the venn diagrams
-library('ggvenn')
-library('RColorBrewer')
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 lPER <- top50PER$Player
 lGameScore <- top50GameScore$Player
 lNBA75 <- NBA75$Player
@@ -202,6 +205,7 @@ dev.off
 
 ```{r}
 #Creating Training and Test Sets
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 set.seed(1)
 # We use the dataset to create a partition (70% training 30% testing)
 index <- createDataPartition(NBA$PER, p=0.70, list=FALSE)
@@ -219,25 +223,26 @@ test.y <- test$PER
 ```
 
 ```{r}
-library(tree)
+ # creating one singular regression tree for PER
 tree.PER <- tree(PER~PTS+AST+TRB+FGpct+Age+FTpct+TOV+PF+STL+BLK, data = NBA)
 plot(tree.PER)
 text(tree.PER)
 ```
 
 ```{r}
-library(tree)
+ # creating one regression tree for GameScore
 tree.GameScore <- tree(GameScore~PTS+AST+FGpct+Age+FTpct+PF+TOV+STL+BLK, data = NBA)
 plot(tree.GameScore)
 text(tree.GameScore)
 ```
 
 
-```{r}
-trees <- c(5,10,20,50,300, 500)
+```{r} 
+# Testing different numbers of trees for a random forest model to optimize for mean squared error when predicting PER
+trees <- c(5, 10, 20, 50, 100, 500)
 mseV <- c()
 for(i in trees){
-  rfmodel <- randomForest(PER~PTS+AST+TRB+Age+FGpct+FTpct, data = training, mtry = 2, na.action = na.exclude, ntree = i)
+  rfmodel <- randomForest(PER~PTS+AST+TRB+Age+FGpct+FTpct+BLK+STL+TOV+PF, data = training, mtry = 2, na.action = na.exclude, ntree = i)
   preds <- predict(rfmodel, test.x)
   preddf <- data.frame(preds, test.y)
   preddf <- na.omit(preddf)
@@ -245,6 +250,75 @@ for(i in trees){
   mseV <- c(mseV, mse)
 }
 which.min(mseV)
-mseV[7]
+```
+
+
+```{r}
+# Testing different numbers of trees for a random forest model to optimize for mean squared error when predicting GameScore
+trees <- c(5, 10, 20, 50, 100, 500)
+mseV <- c()
+for(i in trees){
+  rfmodel <- randomForest(GameScore~PTS+AST+TRB+Age+FGpct+FTpct+BLK+TOV+PF+STL, data = training, mtry = 2, na.action = na.exclude, ntree = i)
+  preds <- predict(rfmodel, test.x)
+  preddf <- data.frame(preds, test.y)
+  preddf <- na.omit(preddf)
+  mse <- (mean((preddf$preds-preddf$test.y)^2))/1e+12
+  mseV <- c(mseV, mse)
+}
+which.min(mseV)
+```
+
+```{r}
+# Creating the random forest model with the optimum number of trees for each variable of interest
+rfmodelPER <- randomForest(PER ~PTS+AST+TRB+Age+FGpct+FTpct+BLK+STL+TOV+PF, data = NBA, mtry = 2, na.action = na.exclude, ntree = 500)
+
+rfmodelGameScore <- randomForest(GameScore~PTS+AST+TRB+Age+FGpct+FTpct+BLK+TOV+PF+STL, data = training, mtry = 2, na.action = na.exclude, ntree = 500)
+```
+
+```{r}
+# Creating the variable importance plot to see what variables are used to split the most nodes for PER
+imp <- data.table(importance(rfmodelPER), keep.rownames = TRUE)
+imp[, rn := factor(rn, unique(rn))]
+ggplot(melt(imp, id.vars="rn"), 
+       aes(x=rn, y=value, label = round(value, 1))) + 
+    geom_lollipop(point.size = 3, point.colour = "cadetblue") +
+    geom_text(nudge_y = 5) +
+    coord_flip() +
+    facet_wrap(~variable) +
+    theme_minimal() +
+    labs(y="Percent", x=NULL)
+```
+
+```{r}
+# Creating the variable importance plot to see what variables are used to split the most nodes for GameScore
+imp <- data.table(importance(rfmodelGameScore), keep.rownames = TRUE)
+imp[, rn := factor(rn, unique(rn))]
+ggplot(melt(imp, id.vars="rn"), 
+       aes(x=rn, y=value, label = round(value, 1))) + 
+    geom_lollipop(point.size = 3, point.colour = "cadetblue") +
+    geom_text(nudge_y = 5) +
+    coord_flip() +
+    facet_wrap(~variable) +
+    theme_minimal() +
+    labs(y="Percent", x=NULL)
+```
+
+```{r}
+# Creation of my new stat (Comes from Domain Research)
+NBA <- NBA %>% mutate(SProd = (((PTS+.4*FG - .6*FGA - .4*(FTA-FT))+1.75*AST+0.7*ORB + 0.33*(ThP))/MP + (STL+0.5*BLK+0.3*DRB)/MP - (TOV*1.5+PF)/MP) * MP) 
+```
+
+```{r}
+#Grabbing the top 50 career players based on my statistic 
+CareerAvgSProd <- NBA %>% dplyr::select(Player, Pos, SProd) %>% group_by(Player) %>% summarise('SProd' = mean(SProd))
+topSProd <- head(sort(CareerAvgSProd$SProd, decreasing = TRUE), n = 50)
+top50SProd <- CareerAvgSProd[CareerAvgSProd$SProd %in% topSProd,]
+top50SProd
+top50SProd <- top50SProd[order(top50SProd$SProd, decreasing = T), ]
+top50SProd
+lSProd <- top50SProd$Player
+x <- list(lSProd = lSProd, lNBA75=lNBA75)
+listVD <- ggvenn(x, show_elements = F, label_sep = '\n', fill_color = brewer.pal(name = "Set2", n=3), text_size = 6)
+listVD
 ```
 
