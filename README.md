@@ -1,8 +1,12 @@
 # DA-401-Project
 ## Jake Caldwell
 
-### Necessary Packages for running code in R 4.1.2
+### Summary:
+\t This project aims to discover if there is possible correlation between the statistical production of an NBA player and how familiar people are with said player. This involves using data from BasketballRefernce.com and collecting data from a survey, using a Random Forest model to perform feature selection on two productivity statistics used by the NBA, and then comparing the top 50 most productive NBA players with the top 50 most recognized NBA players who are on the NBA 75th Anniversary Team. 
+
+### Necessary Packages for running code in R 4.2.2
 * ggalt
+* vegan
 * ggplot2
 * ggthemes
 * data.table
