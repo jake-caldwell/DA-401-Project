@@ -33,3 +33,4 @@
 * Survey.ppx -- This powerpoint is how I ran my survey's with my subjects.
 * InformedConsent.pdf -- this document details my participants oral informed cosent.
 * SurveyDesign.pdf -- this document outlines how my surveys are set up to run.
+* Other files are supplementary writing materials (i.e. initial methods section). 
