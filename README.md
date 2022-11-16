@@ -14,15 +14,17 @@
 * tidyverse
 * randomForest
 * tidyr
+* knitr
 * GGally
 * Hmisc
 * tree
 * RColorBrewer
-* ggvenn
+* ggVennDiagram
 * vtable
 * e1071
 * class
 * boot
+* pysch
 
 ### Data Files
 * (Year)SeasonStats.csv -- there are 42 of these files and each contains the season average basic statistics for each NBA player that played in that season. The range of years is from 1981-2022. 
