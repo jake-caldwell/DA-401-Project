@@ -8,7 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls()) # clears directory every time code is run for memory saving
+#Packages required for running this code file
 library('ggplot2')
+library(ggVennDiagram)
 library(data.table)
 library(dplyr)
 library(tidyr)
@@ -29,13 +31,12 @@ library(cutpointr)
 library(boot)
 library(ggthemes)
 library(Hmisc)               
-library(pander)
-library(purrr)
-library(vtable)
 require(gplots)
 library(ggvenn)
 library(RColorBrewer)
 library(tree)
+library(psych)
+library(VennDiagram)
 ```
 
 ```{r}
@@ -95,16 +96,20 @@ NBA <- NBA %>% mutate(PER = aPER * (15/mean(NBA$aPER)))
 ```
 
 ```{r}
-#Summary Statistics on Variables of Importance 
-library("vtable")
-st(NBA, vars = c('Age', 'PTS', 'AST', 'TRB', 'FGpct', 'TOV', 'PF', 'BLK', 'STL', 'FTpct', 'GameScore', 'PER'))
+#Summary Statistics on Variables of Importance
+summary(NBA)
+describe(NBA)
 ```
+
+
 
 ```{r} 
 #Writing cleaned and wrangled CSV to put into tableau
 setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 write.csv(NBA,"NBA.csv", row.names = FALSE)
 ```
+
+
 
 ```{r}
 #Creating histograms and density plots for GameScore and PER
@@ -115,7 +120,7 @@ GameScoreDist <- NBA %>% ggplot(aes(x=GameScore))+
   geom_vline(aes(xintercept = mean(GameScore)), color = "#000000", size = 1.25) +
   geom_vline(aes(xintercept = mean(GameScore) + 2*sd(GameScore)), color = "#000000", size = 1, linetype = "dashed") +
   theme_classic()+
-theme(title = element_text(size = 28), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20), axis.text = element_text(size = 16))
+theme(title = element_text(size = 20), axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16), axis.text = element_text(size = 12))
 
 PERDist <- NBA %>% ggplot(aes(x=PER))+
   geom_histogram(bins = 10, fill = 'blue', color = '#000000', aes(y = ..density..))+
@@ -124,17 +129,11 @@ PERDist <- NBA %>% ggplot(aes(x=PER))+
   geom_vline(aes(xintercept = mean(PER)), color = "#000000", size = 1.25) +
   geom_vline(aes(xintercept = mean(PER) + 2*sd(PER)), color = "#000000", size = 1, linetype = "dashed") +
   theme_classic()+
-theme(title = element_text(size = 28), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20), axis.text.x = element_text(size = 16), axis.text = element_text(size = 16))
+theme(title = element_text(size = 20), axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16), axis.text.x = element_text(size = 16), axis.text = element_text(size = 12))
   
 
-png("PERDist.png")
-print(PERDist)
-dev.off
-```
-```{r}
-png("GameScoreDist.png")
-print(GameScoreDist)
-dev.off
+ggsave("GSDist.png", GameScoreDist, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals\\", dpi = 300)
+ggsave("PERDist.png", PERDist, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals\\", dpi=300)
 ```
 
 
@@ -155,6 +154,19 @@ topGameScore <- head(sort(CareerAvgGameScore$GameScore, decreasing = TRUE), n = 
 top50PER <- CareerAvgPER[CareerAvgPER$PER %in% topPER,]
 top50GameScore <- CareerAvgGameScore[CareerAvgGameScore$GameScore %in% topGameScore, ]
 ```
+
+```{r}
+# Plot to examine the relationship between PER and GameScore
+relPlot <- ggplot(data = merge(CareerAvgGameScore, CareerAvgPER, by = "Player"), aes(x = CareerAvgGameScore$GameScore, y = CareerAvgPER$PER))+
+  geom_point()+
+  geom_hline(yintercept = 17, col = "red")+
+  geom_vline(xintercept = 10, col = "red")+
+  labs(title = "The NBA's Upper Echelon of Production", x = "GameScore", y = "PER")
+  theme_classic()+
+  theme(title = element_text(size = 28), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20), axis.text.x = element_text(size = 16), axis.text = element_text(size = 16))
+ggsave("relPlot.png", relPlot, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi = 300)
+```
+
 
 ```{r}
 #Create List of NBA 75 Players 
@@ -194,13 +206,19 @@ setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 lPER <- top50PER$Player
 lGameScore <- top50GameScore$Player
 lNBA75 <- NBA75$Player
-
 x <- list(lPER=lPER, lGameScore=lGameScore, lNBA75=lNBA75)
 
-listVD <- ggvenn(x, show_elements = F, label_sep = '\n', fill_color = brewer.pal(name = "Set2", n=3), text_size = 6)
-png("listVD.png")
-print(listVD)
-dev.off
+PERGSVenn <- ggVennDiagram(x, label = "count", label_alpha = 0.4, category.names = c("PER", "GameScore", "NBA 75"))+
+             scale_x_continuous(expand = expansion(mult = .2))+
+             scale_y_continuous(expand = expansion(mult = .2))+
+             ggplot2::scale_fill_gradient(low="yellow",high = "dark green")
+ggsave("PERGSVenn.png", PERGSVenn, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi=300)
+
+
+#listVD <- ggvenn(x, show_elements = F, label_sep = '\n', fill_color = brewer.pal(name = "Set2", n=3), text_size = 6)
+#png("listVD.png")
+#print(listVD)
+#dev.off
 ```
 
 ```{r}
@@ -227,6 +245,7 @@ test.y <- test$PER
 tree.PER <- tree(PER~PTS+AST+TRB+FGpct+Age+FTpct+TOV+PF+STL+BLK, data = NBA)
 plot(tree.PER)
 text(tree.PER)
+title("PER Regression Tree")
 ```
 
 ```{r}
@@ -234,6 +253,7 @@ text(tree.PER)
 tree.GameScore <- tree(GameScore~PTS+AST+FGpct+Age+FTpct+PF+TOV+STL+BLK, data = NBA)
 plot(tree.GameScore)
 text(tree.GameScore)
+title("GameScore Regression Tree")
 ```
 
 
@@ -250,6 +270,7 @@ for(i in trees){
   mseV <- c(mseV, mse)
 }
 which.min(mseV)
+mseV[6]
 ```
 
 
@@ -266,46 +287,59 @@ for(i in trees){
   mseV <- c(mseV, mse)
 }
 which.min(mseV)
+mseV[5]
 ```
 
 ```{r}
 # Creating the random forest model with the optimum number of trees for each variable of interest
-rfmodelPER <- randomForest(PER ~PTS+AST+TRB+Age+FGpct+FTpct+BLK+STL+TOV+PF, data = NBA, mtry = 2, na.action = na.exclude, ntree = 500)
+rfmodelPER <- randomForest(PER ~PTS+AST+TRB+Age+FG+FGA+FT+FTA+ThP+BLK+STL+TOV+PF, data = training, mtry = 2, na.action = na.exclude, ntree = 500)
 
-rfmodelGameScore <- randomForest(GameScore~PTS+AST+TRB+Age+FGpct+FTpct+BLK+TOV+PF+STL, data = training, mtry = 2, na.action = na.exclude, ntree = 500)
+rfmodelGameScore <- randomForest(GameScore~PTS+AST+TRB+Age+FG+FGA+FTA+FT+ThP+BLK+TOV+PF+STL, data = training, mtry = 2, na.action = na.exclude, ntree = 100)
 ```
+
 
 ```{r}
 # Creating the variable importance plot to see what variables are used to split the most nodes for PER
 imp <- data.table(importance(rfmodelPER), keep.rownames = TRUE)
 imp[, rn := factor(rn, unique(rn))]
-ggplot(melt(imp, id.vars="rn"), 
+PERVIP <- ggplot(melt(imp, id.vars="rn"), 
        aes(x=rn, y=value, label = round(value, 1))) + 
     geom_lollipop(point.size = 3, point.colour = "cadetblue") +
     geom_text(nudge_y = 5) +
     coord_flip() +
     facet_wrap(~variable) +
-    theme_minimal() +
-    labs(y="Percent", x=NULL)
+    theme_classic() +
+    labs(title = "Variable Importance plot for PER Random Forest",y="Percent", x=NULL)
+ggsave("PERVIP.png", PERVIP, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi = 300)
 ```
 
 ```{r}
 # Creating the variable importance plot to see what variables are used to split the most nodes for GameScore
 imp <- data.table(importance(rfmodelGameScore), keep.rownames = TRUE)
 imp[, rn := factor(rn, unique(rn))]
-ggplot(melt(imp, id.vars="rn"), 
+GSVIP <- ggplot(melt(imp, id.vars="rn"), 
        aes(x=rn, y=value, label = round(value, 1))) + 
     geom_lollipop(point.size = 3, point.colour = "cadetblue") +
     geom_text(nudge_y = 5) +
     coord_flip() +
     facet_wrap(~variable) +
-    theme_minimal() +
-    labs(y="Percent", x=NULL)
+    theme_classic() +
+    labs(title = "Variable Importance plot for GameScore Random Forest",y="Percent", x=NULL)
+ggsave("GSVIP.png", GSVIP, "png","C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi = 300)
 ```
 
 ```{r}
 # Creation of my new stat (Comes from Domain Research)
 NBA <- NBA %>% mutate(SProd = (((PTS+.4*FG - .6*FGA - .4*(FTA-FT))+1.75*AST+0.7*ORB + 0.33*(ThP))/MP + (STL+0.5*BLK+0.3*DRB)/MP - (TOV*1.5+PF)/MP) * MP) 
+SProdDist <- NBA %>% ggplot(aes(x=SProd))+
+  geom_histogram(bins = 10, fill = 'blue', color = '#000000', aes(y = ..density..))+
+  geom_density(fill = "#F85700", color = "#000000", alpha = 0.6)+
+  labs(title = "Distribution of \n Seasonal PRoduction", x = 'Seasonal Production', y = 'Frequency')+
+  geom_vline(aes(xintercept = mean(SProd)), color = "#000000", size = 1.25) +
+  geom_vline(aes(xintercept = mean(SProd) + 2*sd(SProd)), color = "#000000", size = 1, linetype = "dashed") +
+  theme_classic()+
+theme(title = element_text(size = 20), axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16), axis.text = element_text(size = 12))
+ggsave("SProdDist.png", SProdDist, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals\\", dpi=300)
 ```
 
 ```{r}
@@ -313,12 +347,32 @@ NBA <- NBA %>% mutate(SProd = (((PTS+.4*FG - .6*FGA - .4*(FTA-FT))+1.75*AST+0.7*
 CareerAvgSProd <- NBA %>% dplyr::select(Player, Pos, SProd) %>% group_by(Player) %>% summarise('SProd' = mean(SProd))
 topSProd <- head(sort(CareerAvgSProd$SProd, decreasing = TRUE), n = 50)
 top50SProd <- CareerAvgSProd[CareerAvgSProd$SProd %in% topSProd,]
-top50SProd
 top50SProd <- top50SProd[order(top50SProd$SProd, decreasing = T), ]
-top50SProd
 lSProd <- top50SProd$Player
 x <- list(lSProd = lSProd, lNBA75=lNBA75)
-listVD <- ggvenn(x, show_elements = F, label_sep = '\n', fill_color = brewer.pal(name = "Set2", n=3), text_size = 6)
-listVD
+SPRODVenn <- ggVennDiagram(x, label = "count", label_alpha = 0.4, category.names = c("SProd", "NBA 75"))+
+             scale_x_continuous(expand = expansion(mult = .2))+
+             scale_y_continuous(expand = expansion(mult = .2))+
+             ggplot2::scale_fill_gradient(low="yellow",high = "dark green")
+ggsave("SPRODVenn.png", SPRODVenn, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi=300)
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
+RankedSProd <- read.csv("Top50SeasonProduction.csv")
+RankedFamiliarity <- read.csv("RankedFamiliarity.csv")
 ```
+
+```{r}
+# Calculation of Bray-Curtis Dissimilarity Score without using vegan pakcage
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
+Ranks <- read.csv("RankedFamiliarityandStat.csv")
+BrayCurtisScore <- sum(apply(Ranks, 2, function(x) abs(max(x)-min(x)))) / sum(rowSums(Ranks))
+BrayCurtisScore
+```
+
+```{r}
+#Calculating bray-curtis using vegan package
+braycurtis <- vegdist(Ranks)
+braycurtis
+```
+
+
 
