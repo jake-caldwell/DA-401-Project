@@ -37,11 +37,13 @@ library(RColorBrewer)
 library(tree)
 library(psych)
 library(VennDiagram)
+library(gridExtra)
+library(vegan)
 ```
 
 ```{r}
 NBA <- data.frame() # creates an empty Data Frame
-listcsv <- dir(path = "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\", pattern = "*SeasonStats.csv")
+listcsv <- dir(path = "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\", pattern = "*SeasonStats.csv") ## sets path to my data folder, uses a normal expression to check for ending pattern of *year*SeasonStats.csv
 setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 for (k in 1:length(listcsv)){
  NBA <- rbind(NBA, read.csv(listcsv[k]))
@@ -50,8 +52,16 @@ for (k in 1:length(listcsv)){
 ```
 
 ```{r}
+#Create List of NBA 75 Players 
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
+NBA75 <- read.csv("NBA75.csv") 
+```
+
+
+```{r}
 # Renaming variables and filtering data
 setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
+NBA$Player <- gsub('[\\*,]', '', as.character(NBA$Player)) # removing the * character for a player that was an allstar in a given season
 NBA <- rename(NBA, "FGpct" = "FG.")
 NBA <- rename(NBA, "eFGpct" = "eFG.")
 NBA <- rename(NBA, "ThP" = "X3P")
@@ -61,44 +71,41 @@ NBA <- rename(NBA, "TwP" = "X2P")
 NBA <- rename(NBA, "TwPA" = "X2PA")
 NBA <- rename(NBA, "TwPpct" = "X2P.")
 NBA <- rename(NBA, "FTpct" = "FT.")
-NBA <- NBA%>%filter(Tm != 'TOT')
-NBA$Player <- gsub('[\\*,]', '', as.character(NBA$Player))
-NBA[is.na(NBA)] <- 0
-NBA<-filter(NBA, NBA$G > 20)
-NBA <- filter(NBA, NBA$Pos %in% c('PG', 'SG', 'SF', 'PF', 'C'))
+NBA$NBA75 <- ifelse(NBA$Player %in% NBA75$Player, 1, 0)
+NBA <- NBA%>%filter(Tm != 'TOT') #removing rows that contain aggregated data for a player that was traded midseason
+NBA[is.na(NBA)] <- 0 # changing na values to 0, covers for missing stats like if a player attempted 0 3-pointers so that their 3-point percentage isn't missing. 
+NBA<-filter(NBA, NBA$G > 20) #setting my inclusion criteria
+NBA <- filter(NBA, NBA$Pos %in% c('PG', 'SG', 'SF', 'PF', 'C')) # filtering out players that have an incorrect position label
 ```
 
 ```{r} 
 #Creating variables I need for calculating the PER statistic
-factor <- (2/3) - ((0.5 * (21.8/37.3))/(2 * (37.3/18.8)))
-VOP <- 99.9/(81.5 - 11.2 + 14.1 + (0.44*24.9))
-DRBpct <- (42.0-11.2)/42.0
-factor
-VOP
-DRBpct
+factor <- (2/3) - ((0.5 * (21.8/37.3))/(2 * (37.3/18.8))) # factor is the variable that scales unadjusted PER
+VOP <- 99.9/(81.5 - 11.2 + 14.1 + (0.44*24.9)) # value of possession
+DRBpct <- (42.0-11.2)/42.0 # percentage of rebounds that are defensive
 ```
 
 
 ```{r}
 #Creation of GameScore and PER
-NBA<- NBA%>%mutate(GameScore = NBA$PTS + 0.4*NBA$FG - 0.7*NBA$FGA - 0.4*(NBA$FTA - NBA$FT) + 0.7*NBA$ORB + 0.3*NBA$DRB +0.7*NBA$STL + 0.7*NBA$AST + 0.7*NBA$BLK - 0.4*NBA$PF - NBA$TOV)
+NBA<- NBA%>%mutate(GameScore = NBA$PTS + 0.4*NBA$FG - 0.7*NBA$FGA - 0.4*(NBA$FTA - NBA$FT) + 0.7*NBA$ORB + 0.3*NBA$DRB +0.7*NBA$STL + 0.7*NBA$AST + 0.7*NBA$BLK - 0.4*NBA$PF - NBA$TOV) # linear combination of points, assists, rebounds, steals, blocks, personal fouls, turnovers, free throws and attempts, and field goals and attempts
 
 #Un-adjusted PER
-NBA <- NBA %>% mutate(uPER = (1/MP)*(ThP- ((PF*18.8)/21) +((FT/2)*(2-(21.8/(3*37.3))))+(FG * (2-((factor*21.8)/37.3)))+((2*AST)/3) +(VOP)+(DRBpct*((2*ORB)+BLK-(0.2464*(FTA-FT))-(FGA-FG)                  -TRB)+((0.44*24.9*PF)/21)-(TOV+ORB)+STL+TRB-(.1936*(FTA-FT)))))
+NBA <- NBA %>% mutate(uPER = (1/MP)*(ThP- ((PF*18.8)/21) +((FT/2)*(2-(21.8/(3*37.3))))+(FG * (2-((factor*21.8)/37.3)))+((2*AST)/3) +(VOP)+(DRBpct*((2*ORB)+BLK-(0.2464*(FTA-FT))-(FGA-FG)                  -TRB)+((0.44*24.9*PF)/21)-(TOV+ORB)+STL+TRB-(.1936*(FTA-FT))))) # linear combination of the offensive and defensive contributions a player made per minute 
                         
 
 #Adjusted PER
 NBA <- NBA %>% mutate(aPER = 1.01*uPER)
-NBA[is.na(NBA)] <- 0
+NBA[is.na(NBA)] <- 0 # adjusting for amount of time spent on defense and offense by league average
 
 #Final PER
-NBA <- NBA %>% mutate(PER = aPER * (15/mean(NBA$aPER)))
+NBA <- NBA %>% mutate(PER = aPER * (15/mean(NBA$aPER))) # centering PER at 15 
 ```
 
 ```{r}
 #Summary Statistics on Variables of Importance
-summary(NBA)
-describe(NBA)
+summary(NBA) # summary statistics
+describe(NBA) # extra summary stats, includes standard deviation
 ```
 
 
@@ -132,8 +139,7 @@ PERDist <- NBA %>% ggplot(aes(x=PER))+
 theme(title = element_text(size = 20), axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16), axis.text.x = element_text(size = 16), axis.text = element_text(size = 12))
   
 
-ggsave("GSDist.png", GameScoreDist, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals\\", dpi = 300)
-ggsave("PERDist.png", PERDist, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals\\", dpi=300)
+ggsave("GSPERDist.png", arrangeGrob(GameScoreDist, PERDist), "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals\\", dpi = 300)
 ```
 
 
@@ -143,35 +149,28 @@ setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
 
 CareerAvgPER <- NBA %>% dplyr::select(Player, Pos, PER) %>% group_by(Player) %>% summarise('PER' = mean(PER))
 CareerAvgGameScore <- NBA %>% dplyr::select(Player, Pos, GameScore) %>% group_by(Player) %>% summarise('GameScore' = mean(GameScore))
+# Creates a new data frame that contains each player and their career average PER and GameScore
 
-# Select the top 50 players using career PER and GameScore
+# Select the top 50 players of all time using career PER and GameScore
 
 topPER <- head(sort(CareerAvgPER$PER, decreasing = TRUE), n = 50)
-topGameScore <- head(sort(CareerAvgGameScore$GameScore, decreasing = TRUE), n = 50)
-
-# Table Results
-
+topGameScore <- head(sort(CareerAvgGameScore$GameScore, decreasing = TRUE), n = 50) # sorting by greatest to least
 top50PER <- CareerAvgPER[CareerAvgPER$PER %in% topPER,]
-top50GameScore <- CareerAvgGameScore[CareerAvgGameScore$GameScore %in% topGameScore, ]
+top50GameScore <- CareerAvgGameScore[CareerAvgGameScore$GameScore %in% topGameScore, ] # selecting top 50 results from each list
 ```
 
 ```{r}
 # Plot to examine the relationship between PER and GameScore
-relPlot <- ggplot(data = merge(CareerAvgGameScore, CareerAvgPER, by = "Player"), aes(x = CareerAvgGameScore$GameScore, y = CareerAvgPER$PER))+
+CareerPERGameScore <- merge(CareerAvgGameScore, CareerAvgPER, by = "Player")
+CareerPERGameScore$NBA75 <- ifelse((CareerAvgGameScore$Player %in% NBA75$Player) | (CareerAvgPER$Player %in% NBA75$Player), "Yes", "No")
+relPlot <- ggplot(data = CareerPERGameScore, aes(x = GameScore, y = PER, color = NBA75))+
   geom_point()+
-  geom_hline(yintercept = 17, col = "red")+
-  geom_vline(xintercept = 10, col = "red")+
+  geom_hline(yintercept = 17, col = "black")+
+  geom_vline(xintercept = 10, col = "black")+ # added lines to show the cut off point at 2 standard deviations for each PER and GameScore 
   labs(title = "The NBA's Upper Echelon of Production", x = "GameScore", y = "PER")
   theme_classic()+
   theme(title = element_text(size = 28), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20), axis.text.x = element_text(size = 16), axis.text = element_text(size = 16))
 ggsave("relPlot.png", relPlot, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi = 300)
-```
-
-
-```{r}
-#Create List of NBA 75 Players 
-setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
-NBA75 <- read.csv("NBA75.csv")
 ```
 
 ```{r}
@@ -208,17 +207,11 @@ lGameScore <- top50GameScore$Player
 lNBA75 <- NBA75$Player
 x <- list(lPER=lPER, lGameScore=lGameScore, lNBA75=lNBA75)
 
-PERGSVenn <- ggVennDiagram(x, label = "count", label_alpha = 0.4, category.names = c("PER", "GameScore", "NBA 75"))+
+PERGSVenn <- ggVennDiagram(x, label = "count", label_alpha = 0.4, category.names = c("PER", "GameScore", "NBA 75"))+ # This is the visual that appears in the paper
              scale_x_continuous(expand = expansion(mult = .2))+
              scale_y_continuous(expand = expansion(mult = .2))+
              ggplot2::scale_fill_gradient(low="yellow",high = "dark green")
 ggsave("PERGSVenn.png", PERGSVenn, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi=300)
-
-
-#listVD <- ggvenn(x, show_elements = F, label_sep = '\n', fill_color = brewer.pal(name = "Set2", n=3), text_size = 6)
-#png("listVD.png")
-#print(listVD)
-#dev.off
 ```
 
 ```{r}
@@ -291,7 +284,7 @@ mseV[5]
 ```
 
 ```{r}
-# Creating the random forest model with the optimum number of trees for each variable of interest
+# Creating the random forest model with the optimum number of trees for each variable of interest based on the tests run in the above chunk
 rfmodelPER <- randomForest(PER ~PTS+AST+TRB+Age+FG+FGA+FT+FTA+ThP+BLK+STL+TOV+PF, data = training, mtry = 2, na.action = na.exclude, ntree = 500)
 
 rfmodelGameScore <- randomForest(GameScore~PTS+AST+TRB+Age+FG+FGA+FTA+FT+ThP+BLK+TOV+PF+STL, data = training, mtry = 2, na.action = na.exclude, ntree = 100)
@@ -305,11 +298,10 @@ imp[, rn := factor(rn, unique(rn))]
 PERVIP <- ggplot(melt(imp, id.vars="rn"), 
        aes(x=rn, y=value, label = round(value, 1))) + 
     geom_lollipop(point.size = 3, point.colour = "cadetblue") +
-    geom_text(nudge_y = 5) +
+    geom_text(nudge_y = 5, vjust = -1, size = 3) +
     coord_flip() +
-    facet_wrap(~variable) +
     theme_classic() +
-    labs(title = "Variable Importance plot for PER Random Forest",y="Percent", x=NULL)
+    labs(title = "Variable Importance plot for PER Random Forest",y="Importance Level", x=NULL)
 ggsave("PERVIP.png", PERVIP, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi = 300)
 ```
 
@@ -320,18 +312,17 @@ imp[, rn := factor(rn, unique(rn))]
 GSVIP <- ggplot(melt(imp, id.vars="rn"), 
        aes(x=rn, y=value, label = round(value, 1))) + 
     geom_lollipop(point.size = 3, point.colour = "cadetblue") +
-    geom_text(nudge_y = 5) +
+    geom_text(nudge_y = 5, vjust = -1, size = 3) +
     coord_flip() +
-    facet_wrap(~variable) +
     theme_classic() +
-    labs(title = "Variable Importance plot for GameScore Random Forest",y="Percent", x=NULL)
+    labs(title = "Variable Importance plot for GameScore Random Forest",y="Importance Level", x=NULL)
 ggsave("GSVIP.png", GSVIP, "png","C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi = 300)
 ```
 
 ```{r}
 # Creation of my new stat (Comes from Domain Research)
-NBA <- NBA %>% mutate(SProd = (((PTS+.4*FG - .6*FGA - .4*(FTA-FT))+1.75*AST+0.7*ORB + 0.33*(ThP))/MP + (STL+0.5*BLK+0.3*DRB)/MP - (TOV*1.5+PF)/MP) * MP) 
-SProdDist <- NBA %>% ggplot(aes(x=SProd))+
+NBA <- NBA %>% mutate(SProd = (((PTS+.4*FG - .6*FGA - .4*(FTA-FT))+1.75*AST+0.7*ORB + 0.33*(ThP))/MP + (STL+0.5*BLK+0.3*DRB)/MP - (TOV*1.5+PF)/MP) * MP) # uses similar format to GameScore for interpretability, adds in some combinations of per minute production similar to PER
+SProdDist <- NBA %>% ggplot(aes(x=SProd))+ # plotting the same distribution plot for seasonal production as PER and GameScore
   geom_histogram(bins = 10, fill = 'blue', color = '#000000', aes(y = ..density..))+
   geom_density(fill = "#F85700", color = "#000000", alpha = 0.6)+
   labs(title = "Distribution of \n Seasonal PRoduction", x = 'Seasonal Production', y = 'Frequency')+
@@ -339,25 +330,29 @@ SProdDist <- NBA %>% ggplot(aes(x=SProd))+
   geom_vline(aes(xintercept = mean(SProd) + 2*sd(SProd)), color = "#000000", size = 1, linetype = "dashed") +
   theme_classic()+
 theme(title = element_text(size = 20), axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16), axis.text = element_text(size = 12))
-ggsave("SProdDist.png", SProdDist, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals\\", dpi=300)
 ```
 
 ```{r}
+ggsave("Importance.png", arrangeGrob(PERVIP, GSVIP), "png","C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi = 300)
+```
+
+
+```{r}
 #Grabbing the top 50 career players based on my statistic 
-CareerAvgSProd <- NBA %>% dplyr::select(Player, Pos, SProd) %>% group_by(Player) %>% summarise('SProd' = mean(SProd))
-topSProd <- head(sort(CareerAvgSProd$SProd, decreasing = TRUE), n = 50)
-top50SProd <- CareerAvgSProd[CareerAvgSProd$SProd %in% topSProd,]
+CareerAvgSProd <- NBA %>% dplyr::select(Player, Pos, SProd) %>% group_by(Player) %>% summarise('SProd' = mean(SProd)) # averages career Season Production for each player
+topSProd <- head(sort(CareerAvgSProd$SProd, decreasing = TRUE), n = 50) # sorts by greatest to least career average seasonal production
+top50SProd <- CareerAvgSProd[CareerAvgSProd$SProd %in% topSProd,] # grabs the top 50 greatest career seasonal production 
 top50SProd <- top50SProd[order(top50SProd$SProd, decreasing = T), ]
 lSProd <- top50SProd$Player
 x <- list(lSProd = lSProd, lNBA75=lNBA75)
-SPRODVenn <- ggVennDiagram(x, label = "count", label_alpha = 0.4, category.names = c("SProd", "NBA 75"))+
+SPRODVenn <- ggVennDiagram(x, label = "count", label_alpha = 0.4, category.names = c("Seasonal\nProduction", "NBA 75"))+ # creates a similar venn diagram to the one comparing the contents of PER, Gamescore, and the players on the NBA 75 team that compares the NBA 75 team to the 50 greatest 
              scale_x_continuous(expand = expansion(mult = .2))+
              scale_y_continuous(expand = expansion(mult = .2))+
              ggplot2::scale_fill_gradient(low="yellow",high = "dark green")
 ggsave("SPRODVenn.png", SPRODVenn, "png", "C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Visuals", dpi=300)
 setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
-RankedSProd <- read.csv("Top50SeasonProduction.csv")
-RankedFamiliarity <- read.csv("RankedFamiliarity.csv")
+RankedSProd <- read.csv("Top50SeasonProduction.csv") # reads in the data frame with ranks assigned to players based on their career seasonal production stat
+RankedFamiliarity <- read.csv("RankedFamiliarity.csv") # reads in the data frame that ranks players based on how many times they were recognized in the surveys
 ```
 
 ```{r}
@@ -374,5 +369,18 @@ braycurtis <- vegdist(Ranks)
 braycurtis
 ```
 
+```{r}
+vegdist(Ranks, method = "jaccard")
+```
 
+```{r}
+NBA75SProd <- CareerAvgSProd[CareerAvgSProd$Player %in% NBA75$Player,]
+write.csv(NBA75SProd, "NBA75SProd.csv", row.names = FALSE)
+```
+
+```{r}
+setwd("C:\\Users\\jcald\\OneDrive\\Documents\\DA-401\\Data\\")
+ranks2 <-read.csv("NBA75SProdFamiliarityRanks.csv")
+vegdist(ranks2, method = "bray")
+```
 
